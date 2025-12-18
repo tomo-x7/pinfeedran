@@ -1,4 +1,5 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.2.3/schema.json",
-	"extends": ["./shared/biome.jsonc"]
+	"extends": ["./shared/biome.jsonc"],
+	"json": { "formatter": { "lineWidth": 80 } }
 }

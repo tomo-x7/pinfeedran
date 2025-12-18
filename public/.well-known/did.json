@@ -1,0 +1,11 @@
+{
+	"@context": ["https://www.w3.org/ns/did/v1"],
+	"id": "did:web:pinfeedran.tomo-x.win",
+	"service": [
+		{
+			"id": "#bsky_fg",
+			"type": "BskyFeedGenerator",
+			"serviceEndpoint": "https://pinfeedran.tomo-x.win"
+		}
+	]
+}
