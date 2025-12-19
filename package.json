@@ -4,7 +4,7 @@
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
-		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings src/generated.d.ts",
 		"check": "biome check --write"
 	},
 	"dependencies": {
@@ -12,6 +12,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.3",
+		"@types/node": "^25.0.3",
 		"wrangler": "^4.4.0"
 	},
 	"pnpm": {
