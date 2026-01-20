@@ -1,7 +1,7 @@
 import { Agent, type AppBskyFeedGetFeedSkeleton } from "@atproto/api";
 import { type Context, Hono } from "hono";
 
-const BEARER = "bearer ";
+const BEARER = "Bearer ";
 const GET_FEED_SKELETON = "/xrpc/app.bsky.feed.getFeedSkeleton";
 const agent = new Agent("https://public.api.bsky.app");
 
@@ -24,9 +24,7 @@ app.get(GET_FEED_SKELETON, async (c) => {
 
 function getDid(c: Context): string | null {
 	const auth = c.req.header("Authorization");
-	if (!auth?.startsWith(BEARER)) {
-		return null;
-	}
+	if (!auth?.startsWith(BEARER)) return null;
 	const token = auth.slice(BEARER.length);
 	try {
 		const did = JSON.parse(atob(token.split(".")[1])).iss;
