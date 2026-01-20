@@ -53,7 +53,6 @@ async function getFollow(did: string): Promise<string[]> {
 	return follows;
 }
 async function getPinPosts(dids: string[]): Promise<string[]> {
-	const didblocks: string[][] = [];
 	const _getPinPosts = (dids: string[]) =>
 		agent.app.bsky.actor
 			.getProfiles({ actors: dids })
@@ -64,7 +63,14 @@ async function getPinPosts(dids: string[]): Promise<string[]> {
 		const promise = _getPinPosts(current);
 		promises.push(promise);
 	}
-	return (await Promise.all(promises)).flat().filter((d) => d != null);
+	const raw = await Promise.all(promises);
+	const data = raw
+		.flat()
+		.filter((uri) => uri != null)
+		.map((uri) => ({ uri, r: Math.random() }))
+		.toSorted((a, b) => a.r - b.r)
+		.map((d) => d.uri);
+	return data;
 }
 
 app.onError((err, c) => {
