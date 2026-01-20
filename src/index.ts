@@ -15,11 +15,11 @@ app.get(GET_FEED_SKELETON, async (c) => {
 	const did = getDid(c);
 	if (did == null) return c.json({ status: "Unauthorized" }, 401);
 	const rawData = await getFeedData(c, did);
-	const start = Number.parseInt(c.req.param("cursor") ?? "0", 10);
-	const end = start + Number.parseInt(c.req.param("limit") ?? "50", 10);
+	const start = Number.parseInt(c.req.query("cursor") ?? "0", 10);
+	const end = start + Number.parseInt(c.req.query("limit") ?? "50", 10);
 	const feed = rawData.slice(start, end).map((uri) => ({ post: uri }));
 	const cursor = end >= rawData.length ? undefined : end.toString();
-	console.log({ start, end, cursor });
+	console.log(JSON.stringify({ start, end, cursor,feedl:feed.length }));
 	return c.json({ feed, cursor } satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
 });
 
