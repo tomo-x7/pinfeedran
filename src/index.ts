@@ -19,6 +19,7 @@ app.get(GET_FEED_SKELETON, async (c) => {
 	const end = start + Number.parseInt(c.req.param("limit") ?? "50", 10);
 	const feed = rawData.slice(start, end).map((uri) => ({ post: uri }));
 	const cursor = end >= rawData.length ? undefined : end.toString();
+	console.log({ start, end, cursor });
 	return c.json({ feed, cursor } satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
 });
 
