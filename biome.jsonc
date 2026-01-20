@@ -1,5 +1,8 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.2.3/schema.json",
 	"extends": ["./shared/biome.jsonc"],
-	"json": { "formatter": { "lineWidth": 80 } }
+	"json": { "formatter": { "lineWidth": 80 } },
+	"files": {
+		"includes": ["**/*.json", "**/*.jsonc", "**/*.ts", "!**/generated.d.ts"]
+	}
 }
