@@ -14,12 +14,11 @@ const app = new Hono<Env>();
 app.get(GET_FEED_SKELETON, async (c) => {
 	const did = getDid(c);
 	if (did == null) return c.json({ status: "Unauthorized" }, 401);
-	const rawData = await getFeedData(c, did);
+	const rawData = await getFeedData(c, did,!c.req.query("cursor"));	//cursorがない場合、初回リクエストとしてリセット
 	const start = Number.parseInt(c.req.query("cursor") ?? "0", 10);
 	const end = start + Number.parseInt(c.req.query("limit") ?? "50", 10);
 	const feed = rawData.slice(start, end).map((uri) => ({ post: uri }));
 	const cursor = end >= rawData.length ? undefined : end.toString();
-	console.log(JSON.stringify({ start, end, cursor,feedl:feed.length }));
 	return c.json({ feed, cursor } satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
 });
 
@@ -34,10 +33,13 @@ function getDid(c: Context): string | null {
 		return null;
 	}
 }
-async function getFeedData(c: Context<Env>, did: string): Promise<string[]> {
+async function getFeedData(c: Context<Env>, did: string, noCache: boolean = false): Promise<string[]> {
 	const redis = c.env.KV;
-	const cached = await redis.get(did, "text");
-	if (cached != null) return cached.split(",");
+	if (!noCache) {
+		const cached = await redis.get(did, "text");
+		if (cached != null) return cached.split(",");
+	}
+	console.log("refresh")
 	const follows = await getFollow(did);
 	const data = await getPinPosts(follows);
 	await redis.put(did, data.join(","), { expirationTtl: 10 * 60 });
