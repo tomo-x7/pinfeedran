@@ -14,7 +14,9 @@ const app = new Hono<Env>();
 app.get(GET_FEED_SKELETON, async (c) => {
 	const did = getDid(c);
 	if (did == null) return c.json({ status: "Unauthorized" }, 401);
-	const rawData = await getFeedData(c, did,!c.req.query("cursor"));	//cursorがない場合、初回リクエストとしてリセット
+	// cursorがある(通常のページネーション)か、limitが1(polling対策)
+	const useCache = !!c.req.query("cursor") || Number.parseInt(c.req.query("limit") ?? "50", 10) < 2;
+	const rawData = await getFeedData(c, did, useCache);
 	const start = Number.parseInt(c.req.query("cursor") ?? "0", 10);
 	const end = start + Number.parseInt(c.req.query("limit") ?? "50", 10);
 	const feed = rawData.slice(start, end).map((uri) => ({ post: uri }));
@@ -33,13 +35,12 @@ function getDid(c: Context): string | null {
 		return null;
 	}
 }
-async function getFeedData(c: Context<Env>, did: string, noCache: boolean = false): Promise<string[]> {
+async function getFeedData(c: Context<Env>, did: string, useCache: boolean = true): Promise<string[]> {
 	const redis = c.env.KV;
-	if (!noCache) {
+	if (useCache) {
 		const cached = await redis.get(did, "text");
-		if (cached != null) return cached.split(",");
+		if (cached != null) {return cached.split(",");}
 	}
-	console.log("refresh")
 	const follows = await getFollow(did);
 	const data = await getPinPosts(follows);
 	await redis.put(did, data.join(","), { expirationTtl: 10 * 60 });
