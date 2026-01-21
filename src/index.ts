@@ -21,7 +21,7 @@ app.get(GET_FEED_SKELETON, async (c) => {
 	const follow = await getFollow(c, did, start, end, useCache);
 	const rawData = await getPinPosts(follow);
 	const feed = rawData.map((uri) => ({ post: uri }));
-	const cursor = end >= rawData.length ? undefined : end.toString();
+	const cursor = end >= follow.length ? undefined : end.toString();
 	return c.json({ feed, cursor } satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
 });
 
