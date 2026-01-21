@@ -16,10 +16,11 @@ app.get(GET_FEED_SKELETON, async (c) => {
 	if (did == null) return c.json({ status: "Unauthorized" }, 401);
 	// cursorがある(通常のページネーション)か、limitが1(polling対策)
 	const useCache = !!c.req.query("cursor") || Number.parseInt(c.req.query("limit") ?? "50", 10) < 2;
-	const rawData = await getFeedData(c, did, useCache);
 	const start = Number.parseInt(c.req.query("cursor") ?? "0", 10);
 	const end = start + Number.parseInt(c.req.query("limit") ?? "50", 10);
-	const feed = rawData.slice(start, end).map((uri) => ({ post: uri }));
+	const follow = await getFollow(c, did, start, end, useCache);
+	const rawData = await getPinPosts(follow);
+	const feed = rawData.map((uri) => ({ post: uri }));
 	const cursor = end >= rawData.length ? undefined : end.toString();
 	return c.json({ feed, cursor } satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
 });
@@ -35,18 +36,19 @@ function getDid(c: Context): string | null {
 		return null;
 	}
 }
-async function getFeedData(c: Context<Env>, did: string, useCache: boolean = true): Promise<string[]> {
-	const redis = c.env.KV;
+async function getFollow(
+	c: Context<Env>,
+	did: string,
+	start: number,
+	end: number,
+	useCache: boolean,
+): Promise<string[]> {
 	if (useCache) {
-		const cached = await redis.get(did, "text");
-		if (cached != null) {return cached.split(",");}
+		const cached = await c.env.KV.get(did, "text");
+		if (cached != null) {
+			return cached.split(",").slice(start, end);
+		}
 	}
-	const follows = await getFollow(did);
-	const data = await getPinPosts(follows);
-	await redis.put(did, data.join(","), { expirationTtl: 10 * 60 });
-	return data;
-}
-async function getFollow(did: string): Promise<string[]> {
 	let cursor: string | undefined;
 	const follows: string[] = [];
 	do {
@@ -54,7 +56,12 @@ async function getFollow(did: string): Promise<string[]> {
 		follows.push(...data.follows.map((d) => d.did));
 		cursor = data.cursor;
 	} while (cursor != null);
-	return follows;
+	const sortedFollows = follows
+		.map((v) => ({ v, r: Math.random() }))
+		.toSorted((a, b) => a.r - b.r)
+		.map((v) => v.v);
+	await c.env.KV.put(did, sortedFollows.join(","), { expirationTtl: 24 * 60 * 60 });
+	return sortedFollows.slice(start, end);
 }
 async function getPinPosts(dids: string[]): Promise<string[]> {
 	const _getPinPosts = (dids: string[]) =>
@@ -68,12 +75,7 @@ async function getPinPosts(dids: string[]): Promise<string[]> {
 		promises.push(promise);
 	}
 	const raw = await Promise.all(promises);
-	const data = raw
-		.flat()
-		.filter((uri) => uri != null)
-		.map((uri) => ({ uri, r: Math.random() }))
-		.toSorted((a, b) => a.r - b.r)
-		.map((d) => d.uri);
+	const data = raw.flat().filter((uri) => uri != null);
 	return data;
 }
 
