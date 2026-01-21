@@ -15,14 +15,15 @@ app.get(GET_FEED_SKELETON, async (c) => {
 	const did = getDid(c);
 	if (did == null) return c.json({ status: "Unauthorized" }, 401);
 	// cursorがある(通常のページネーション)か、limitが1(polling対策)
-	const useCache = !!c.req.query("cursor") || Number.parseInt(c.req.query("limit") ?? "50", 10) < 2;
+	const reSort = !!c.req.query("cursor") || Number.parseInt(c.req.query("limit") ?? "50", 10) < 2;
 	const start = Number.parseInt(c.req.query("cursor") ?? "0", 10);
 	const end = start + Number.parseInt(c.req.query("limit") ?? "50", 10);
-	const follow = await getFollow(c, did, start, end, useCache);
-	const rawData = await getPinPosts(follow);
-	const feed = rawData.map((uri) => ({ post: uri }));
-	const cursor = end >= follow.length ? undefined : end.toString();
-	return c.json({ feed, cursor } satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
+	const { follows, cursor } = await getFollows(c, did, start, end, reSort);
+	const rawData = await getPinPosts(follows);
+	return c.json({
+		feed: rawData.map((uri) => ({ post: uri })),
+		cursor,
+	} satisfies AppBskyFeedGetFeedSkeleton.OutputSchema);
 });
 
 function getDid(c: Context): string | null {
@@ -36,19 +37,33 @@ function getDid(c: Context): string | null {
 		return null;
 	}
 }
-async function getFollow(
+async function getFollows(
 	c: Context<Env>,
 	did: string,
 	start: number,
 	end: number,
-	useCache: boolean,
-): Promise<string[]> {
-	if (useCache) {
-		const cached = await c.env.KV.get(did, "text");
-		if (cached != null) {
-			return cached.split(",").slice(start, end);
+	reSort: boolean,
+): Promise<{ follows: string[]; cursor: string | undefined }> {
+	const newCursor = (followsL: number) => (end >= followsL ? undefined : end.toString());
+	const cached = await c.env.KV.getWithMetadata<{ created: number }>(did, "text");
+	const created = cached.metadata?.created ?? Date.now() / 1000;
+	if (cached.value != null) {
+		const follows = cached.value.split(",");
+		const cursor = newCursor(follows.length);
+		if (reSort) {
+			const sortedFollows = follows
+				.map((v) => ({ v, r: Math.random() }))
+				.toSorted((a, b) => a.r - b.r)
+				.map((v) => v.v);
+			await c.env.KV.put(did, sortedFollows.join(","), {
+				expiration: created + 6 * 60 * 60,
+				metadata: { created },
+			});
+			return { follows: sortedFollows.slice(start, end), cursor };
 		}
+		return { follows, cursor };
 	}
+
 	let cursor: string | undefined;
 	const follows: string[] = [];
 	do {
@@ -60,8 +75,8 @@ async function getFollow(
 		.map((v) => ({ v, r: Math.random() }))
 		.toSorted((a, b) => a.r - b.r)
 		.map((v) => v.v);
-	await c.env.KV.put(did, sortedFollows.join(","), { expirationTtl: 24 * 60 * 60 });
-	return sortedFollows.slice(start, end);
+	await c.env.KV.put(did, sortedFollows.join(","), { expirationTtl: 24 * 60 * 60, metadata: { created } });
+	return { follows: sortedFollows.slice(start, end), cursor: newCursor(follows.length) };
 }
 async function getPinPosts(dids: string[]): Promise<string[]> {
 	const _getPinPosts = (dids: string[]) =>
