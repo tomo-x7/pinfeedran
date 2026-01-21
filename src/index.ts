@@ -15,10 +15,10 @@ app.get(GET_FEED_SKELETON, async (c) => {
 	const did = getDid(c);
 	if (did == null) return c.json({ status: "Unauthorized" }, 401);
 	// cursorがある(通常のページネーション)か、limitが1(polling対策)
-	const reSort = !!c.req.query("cursor") || Number.parseInt(c.req.query("limit") ?? "50", 10) < 2;
+	const noSort = !!c.req.query("cursor") || Number.parseInt(c.req.query("limit") ?? "50", 10) < 2;
 	const start = Number.parseInt(c.req.query("cursor") ?? "0", 10);
 	const end = start + Number.parseInt(c.req.query("limit") ?? "50", 10);
-	const { follows, cursor } = await getFollows(c, did, start, end, reSort);
+	const { follows, cursor } = await getFollows(c, did, start, end, noSort);
 	const rawData = await getPinPosts(follows);
 	return c.json({
 		feed: rawData.map((uri) => ({ post: uri })),
@@ -42,7 +42,7 @@ async function getFollows(
 	did: string,
 	start: number,
 	end: number,
-	reSort: boolean,
+	noSort: boolean,
 ): Promise<{ follows: string[]; cursor: string | undefined }> {
 	const newCursor = (followsL: number) => (end >= followsL ? undefined : end.toString());
 	const cached = await c.env.KV.getWithMetadata<{ created: number }>(did, "text");
@@ -50,7 +50,7 @@ async function getFollows(
 	if (cached.value != null) {
 		const follows = cached.value.split(",");
 		const cursor = newCursor(follows.length);
-		if (reSort) {
+		if (!noSort) {
 			const sortedFollows = follows
 				.map((v) => ({ v, r: Math.random() }))
 				.toSorted((a, b) => a.r - b.r)
