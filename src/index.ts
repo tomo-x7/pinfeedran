@@ -61,7 +61,7 @@ async function getFollows(
 			});
 			return { follows: sortedFollows.slice(start, end), cursor };
 		}
-		return { follows, cursor };
+		return { follows: follows.slice(start, end), cursor };
 	}
 
 	let cursor: string | undefined;
