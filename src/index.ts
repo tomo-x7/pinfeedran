@@ -61,7 +61,7 @@ async function getFollows(
 			});
 			return { follows: sortedFollows.slice(start, end), cursor };
 		}
-		return { follows, cursor };
+		return { follows: follows.slice(start, end), cursor };
 	}
 
 	let cursor: string | undefined;
@@ -75,7 +75,7 @@ async function getFollows(
 		.map((v) => ({ v, r: Math.random() }))
 		.toSorted((a, b) => a.r - b.r)
 		.map((v) => v.v);
-	await c.env.KV.put(did, sortedFollows.join(","), { expirationTtl: 24 * 60 * 60, metadata: { created } });
+	await c.env.KV.put(did, sortedFollows.join(","), { expirationTtl: 6 * 60 * 60, metadata: { created } });
 	return { follows: sortedFollows.slice(start, end), cursor: newCursor(follows.length) };
 }
 async function getPinPosts(dids: string[]): Promise<string[]> {
@@ -95,7 +95,15 @@ async function getPinPosts(dids: string[]): Promise<string[]> {
 }
 
 app.onError((err, c) => {
-	console.error(err);
+	console.error(JSON.stringify({
+		name: err.name,
+		message: err.message,
+		stack: err.stack,
+		cause: err.cause instanceof Error
+			? err.cause.message
+			: err.cause,
+	}));
+
 	return c.json({ name: "UnknownError" }, 500);
 });
 
